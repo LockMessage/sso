@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/LockMessage/sso/internal/domain"
 	"github.com/LockMessage/sso/internal/domain/models"
-	"github.com/LockMessage/sso/internal/infrastructure/jwt"
 	"github.com/LockMessage/sso/internal/infrastructure/logger/sl"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,8 +17,7 @@ type Auth struct {
 	usrSaver    UserSaver
 	usrProvider UserProvider
 	appProvider AppProvider
-	tokenTTL    time.Duration
-	RefTokenTTL time.Duration
+	jwtAdapter  JwtAdapter
 }
 
 var (
@@ -40,21 +37,26 @@ type AppProvider interface {
 	App(ctx context.Context, appID int32) (models.App, error)
 }
 
+type JwtAdapter interface {
+	RenewAccessToken(oldRefresh string, user models.User, app models.App) (string, error)
+	GenerateTokenPair(user models.User, app models.App) (access, refresh string, err error)
+	DecodeTokenWithVerification(tokenString, secretKey string) (map[string]any, error)
+}
+
 func New(
 	log *slog.Logger,
 	userSaver UserSaver,
 	userProvider UserProvider,
 	appProvider AppProvider,
-	tokenTTL time.Duration,
-	refTokenTTL time.Duration) *Auth {
+	jwtAdapter JwtAdapter,
+) *Auth {
 
 	return &Auth{
 		logger:      log,
 		usrSaver:    userSaver,
 		usrProvider: userProvider,
 		appProvider: appProvider,
-		tokenTTL:    tokenTTL,
-		RefTokenTTL: refTokenTTL,
+		jwtAdapter:  jwtAdapter,
 	}
 }
 
@@ -68,7 +70,7 @@ func (a *Auth) RefreshToken(ctx context.Context, req models.RefreshTokenRequest)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
-	claims, err := jwt.DecodeTokenWithVerification(req.RefreshToken, app.Secret)
+	claims, err := a.jwtAdapter.DecodeTokenWithVerification(req.RefreshToken, app.Secret)
 	if err != nil {
 		a.logger.Error("failed to decode token", sl.Err(err))
 		return "", fmt.Errorf("%s: %w", op, domain.ErrInvalidToken)
@@ -83,7 +85,7 @@ func (a *Auth) RefreshToken(ctx context.Context, req models.RefreshTokenRequest)
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
 
-	newToken, err := jwt.RenewAccessToken(req.RefreshToken, user, app, a.tokenTTL)
+	newToken, err := a.jwtAdapter.RenewAccessToken(req.RefreshToken, user, app)
 	if err != nil {
 		a.logger.Error("failed to renew token user", sl.Err(err))
 		return "", fmt.Errorf("%s: %w", op, err)
@@ -114,7 +116,7 @@ func (a *Auth) Login(ctx context.Context, req models.LoginRequest) (string, stri
 		return "", "", fmt.Errorf("%s: %w", op, err)
 	}
 	log.Info("user logged successfully")
-	token, refToken, err := jwt.GenerateTokenPair(user, app, a.tokenTTL, a.RefTokenTTL)
+	token, refToken, err := a.jwtAdapter.GenerateTokenPair(user, app)
 	if err != nil {
 		a.logger.Error("failed to generate token", sl.Err(err))
 		return "", "", fmt.Errorf("%s: %w", op, err)

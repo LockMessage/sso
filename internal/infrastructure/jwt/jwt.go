@@ -18,7 +18,16 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-func RenewAccessToken(oldRefresh string, user models.User, app models.App, TokenTTL time.Duration) (string, error) {
+type Adapter struct {
+	TokenTTL    time.Duration
+	RefTokenTTL time.Duration
+}
+
+func New(tokenTTL time.Duration, refTokenTTL time.Duration) *Adapter {
+	return &Adapter{TokenTTL: tokenTTL, RefTokenTTL: refTokenTTL}
+}
+
+func (a *Adapter) RenewAccessToken(oldRefresh string, user models.User, app models.App) (string, error) {
 	parsed, err := jwt.ParseWithClaims(
 		oldRefresh,
 		&CustomClaims{},
@@ -46,7 +55,7 @@ func RenewAccessToken(oldRefresh string, user models.User, app models.App, Token
 		return "", domain.ErrTokenExpired
 	}
 
-	refresh, err := GenerateToken("access", user, app, TokenTTL)
+	refresh, err := generateToken("access", user, app, a.TokenTTL)
 	if err != nil {
 		return "", err
 	}
@@ -54,7 +63,22 @@ func RenewAccessToken(oldRefresh string, user models.User, app models.App, Token
 	return refresh, nil
 }
 
-func GenerateToken(tokenType string, user models.User, app models.App, tokenTTL time.Duration) (string, error) {
+func (a *Adapter) GenerateTokenPair(user models.User, app models.App) (access, refresh string, err error) {
+
+	access, err = generateToken("access", user, app, a.TokenTTL)
+
+	if err != nil {
+		return "", "", err
+	}
+	refresh, err = generateToken("refresh", user, app, a.RefTokenTTL)
+	if err != nil {
+		return "", "", err
+	}
+
+	return access, refresh, nil
+}
+
+func generateToken(tokenType string, user models.User, app models.App, tokenTTL time.Duration) (string, error) {
 	claims := CustomClaims{
 		UID:       user.ID,
 		Email:     user.Email,
@@ -74,22 +98,7 @@ func GenerateToken(tokenType string, user models.User, app models.App, tokenTTL 
 	return token, nil
 }
 
-func GenerateTokenPair(user models.User, app models.App, tokenTTL, refTokenTTL time.Duration) (access, refresh string, err error) {
-
-	access, err = GenerateToken("access", user, app, tokenTTL)
-
-	if err != nil {
-		return "", "", err
-	}
-	refresh, err = GenerateToken("refresh", user, app, tokenTTL)
-	if err != nil {
-		return "", "", err
-	}
-
-	return access, refresh, nil
-}
-
-func DecodeTokenWithVerification(tokenString, secretKey string) (jwt.MapClaims, error) {
+func (a *Adapter) DecodeTokenWithVerification(tokenString, secretKey string) (map[string]any, error) {
 	token, err := jwt.ParseWithClaims(tokenString, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

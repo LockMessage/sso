@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/LockMessage/sso/internal/deliver/grpc/server"
+	"github.com/LockMessage/sso/internal/infrastructure/jwt"
 	"github.com/LockMessage/sso/internal/repository/postgres"
 	"github.com/LockMessage/sso/internal/usecase/auth"
 	"google.golang.org/grpc"
@@ -21,10 +22,11 @@ type App struct {
 func New(log *slog.Logger, grpcPort int, storagePath string, tokenTTL, refTokenTTL time.Duration) *App {
 	gRPCSever := grpc.NewServer()
 	storage, err := postgres.New(storagePath)
+	jwtAdapter := jwt.New(tokenTTL, refTokenTTL)
 	if err != nil {
 		panic(err)
 	}
-	authService := auth.New(log, storage, storage, storage, tokenTTL, refTokenTTL)
+	authService := auth.New(log, storage, storage, storage, jwtAdapter)
 	server.Register(gRPCSever, authService)
 	return &App{log: log, gRPCServer: gRPCSever, port: grpcPort}
 }
