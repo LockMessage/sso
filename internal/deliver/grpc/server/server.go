@@ -88,6 +88,12 @@ func (s *serverAPI) Register(ctx context.Context, req *ssov1.RegisterRequest) (*
 		if errors.Is(err, domain.ErrUserExists) {
 			return nil, status.Error(codes.AlreadyExists, "user already exists")
 		}
+		if errors.Is(err, domain.ErrWrongEmailFormat) {
+			return nil, status.Error(codes.InvalidArgument, "wrong email format")
+		}
+		if errors.Is(err, domain.ErrWrongPasswordFormat) {
+			return nil, status.Error(codes.InvalidArgument, domain.ErrWrongPasswordFormat.Error())
+		}
 		return nil, status.Error(codes.Internal, "internal error")
 	}
 	return &ssov1.RegisterResponse{UserId: userID}, nil

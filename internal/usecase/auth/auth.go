@@ -8,6 +8,7 @@ import (
 
 	"github.com/LockMessage/sso/internal/domain"
 	"github.com/LockMessage/sso/internal/domain/models"
+	"github.com/LockMessage/sso/internal/domain/rules/validation"
 	"github.com/LockMessage/sso/internal/infrastructure/logger/sl"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -130,8 +131,15 @@ func (a *Auth) RegisterNewUser(ctx context.Context, req models.RegisterRequest) 
 		slog.String("op", op),
 	)
 	log.Info("registering user")
+	if err := validation.ValidateEmail(req.Email); err != nil {
+		return 0, fmt.Errorf("%s: %w", op, domain.ErrWrongEmailFormat)
+	}
+	if err := validation.ValidatePassword(req.Password); err != nil {
+		return 0, fmt.Errorf("%s: %w", op, domain.ErrWrongPasswordFormat)
+	}
 	_, err := a.usrProvider.FindByEmail(ctx, req.Email)
 	if !errors.Is(err, domain.ErrUserNotFound) {
+		log.Error("err", err)
 		return 0, fmt.Errorf("%s: %w", op, domain.ErrUserExists)
 	}
 	passHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
