@@ -29,7 +29,7 @@ type UserSaver interface {
 }
 
 type UserProvider interface {
-	User(ctx context.Context, email string) (models.User, error)
+	FindByEmail(ctx context.Context, email string) (models.User, error)
 	IsAdmin(ctx context.Context, userID int64) (bool, error)
 }
 
@@ -75,7 +75,7 @@ func (a *Auth) RefreshToken(ctx context.Context, req models.RefreshTokenRequest)
 		a.logger.Error("failed to decode token", sl.Err(err))
 		return "", fmt.Errorf("%s: %w", op, domain.ErrInvalidToken)
 	}
-	user, err := a.usrProvider.User(ctx, claims["email"].(string))
+	user, err := a.usrProvider.FindByEmail(ctx, claims["email"].(string))
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			a.logger.Warn("user not found", sl.Err(err))
@@ -99,7 +99,7 @@ func (a *Auth) Login(ctx context.Context, req models.LoginRequest) (string, stri
 		slog.String("op", op),
 	)
 	log.Info("attempting to login user")
-	user, err := a.usrProvider.User(ctx, req.Email)
+	user, err := a.usrProvider.FindByEmail(ctx, req.Email)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			a.logger.Warn("user not found", sl.Err(err))
@@ -130,6 +130,10 @@ func (a *Auth) RegisterNewUser(ctx context.Context, req models.RegisterRequest) 
 		slog.String("op", op),
 	)
 	log.Info("registering user")
+	_, err := a.usrProvider.FindByEmail(ctx, req.Email)
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		return 0, fmt.Errorf("%s: %w", op, domain.ErrUserExists)
+	}
 	passHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Error("failed to generate password hash", sl.Err(err))

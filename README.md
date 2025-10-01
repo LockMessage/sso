@@ -5,7 +5,7 @@ Single Sign-On (SSO) service for Citadelas microservices architecture. Provides 
 ## 🏗️ Overview
 
 This service handles:
-- User registration and authentication
+- FindByEmail registration and authentication
 - JWT access and refresh token management
 - Admin role verification
 - Secure password hashing with bcrypt
@@ -283,7 +283,7 @@ logging:
 ### Logging
 Structured JSON logs include:
 - Request ID for tracing
-- User ID (when available)
+- FindByEmail ID (when available)
 - Operation type
 - Error details
 - Performance metrics
