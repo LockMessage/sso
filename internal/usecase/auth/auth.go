@@ -139,7 +139,6 @@ func (a *Auth) RegisterNewUser(ctx context.Context, req models.RegisterRequest) 
 	}
 	_, err := a.usrProvider.FindByEmail(ctx, req.Email)
 	if !errors.Is(err, domain.ErrUserNotFound) {
-		log.Error("err", err)
 		return 0, fmt.Errorf("%s: %w", op, domain.ErrUserExists)
 	}
 	passHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
