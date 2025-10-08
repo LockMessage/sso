@@ -1,9 +1,11 @@
 package jwt
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/LockMessage/sso/internal/domain"
 	"github.com/LockMessage/sso/internal/domain/models"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
@@ -53,4 +55,24 @@ func TestDecodeTokenWithVerification_Success(t *testing.T) {
 	decoded, err := a.DecodeTokenWithVerification(tokenString, secret)
 	require.NoError(t, err)
 	require.Equal(t, "bar", decoded["foo"])
+}
+
+func TestDecodeTokenWithVerification_Expired(t *testing.T) {
+	a := New(1*time.Nanosecond, 1*time.Nanosecond)
+	user := models.User{ID: 42, Email: "user@example.com"}
+	app := models.App{ID: 7, Secret: "supersecretkey"}
+	token, refresh, err := a.GenerateTokenPair(user, app)
+	require.NoError(t, err)
+	_, err = a.DecodeTokenWithVerification(token, app.Secret)
+	assertEqualError(t, domain.ErrTokenExpired, err)
+
+	_, err = a.DecodeTokenWithVerification(refresh, app.Secret)
+	assertEqualError(t, domain.ErrTokenExpired, err)
+}
+
+func assertEqualError(t *testing.T, expected, actual error) {
+	t.Helper()
+	if !errors.Is(actual, expected) {
+		t.Errorf("Expected %v, got %v", expected, actual)
+	}
 }
