@@ -8,6 +8,7 @@ import (
 )
 
 func TestValidEmails(t *testing.T) {
+	t.Parallel()
 	validEmails := []struct {
 		name string
 		want error

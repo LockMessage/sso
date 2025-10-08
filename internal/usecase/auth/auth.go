@@ -25,12 +25,20 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
+// UserSaver stores a new user in the repository.
+// It returns an error if the user already exists or if there's a database error.
+// The user's ID field will be populated with the generated identifier.
 type UserSaver interface {
 	SaveUser(ctx context.Context, email string, passHash []byte) (uid int64, err error)
 }
 
+// UserProvider provides user.
 type UserProvider interface {
+	// FindByEmail retrieves a user by their email address.
+	// It returns domain.ErrUserNotFound if no user exists with the given email.
 	FindByEmail(ctx context.Context, email string) (models.User, error)
+	// IsAdmin retrieves is admin boolean by user id.
+	// It returns domain.ErrUserNotFound if no user exists with the id.
 	IsAdmin(ctx context.Context, userID int64) (bool, error)
 }
 
