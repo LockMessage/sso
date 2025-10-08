@@ -41,3 +41,16 @@ func TestGenerateTokenPair(t *testing.T) {
 	require.Equal(t, "refresh", claimsR.TokenType)
 	require.True(t, parsedR.Valid)
 }
+
+func TestDecodeTokenWithVerification_Success(t *testing.T) {
+	// Create a simple MapClaims token
+	a := New(0, 0)
+	secret := "supersecretkey"
+	claims := jwt.MapClaims{"foo": "bar", "exp": jwt.NewNumericDate(time.Now().Add(1 * time.Hour)).Unix()}
+	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+	require.NoError(t, err)
+
+	decoded, err := a.DecodeTokenWithVerification(tokenString, secret)
+	require.NoError(t, err)
+	require.Equal(t, "bar", decoded["foo"])
+}
